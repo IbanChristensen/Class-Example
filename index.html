@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Morning routine</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f8f6ef;color:#25372c;font:16px/1.5 "DM Sans",system-ui,sans-serif}main{max-width:900px;margin:auto;padding:44px 20px}header{position:relative;isolation:isolate;overflow:hidden;background:#e9ecd7;border-radius:22px;padding:32px 34px;margin-bottom:22px}header:after{content:"";position:absolute;z-index:-1;width:170px;height:170px;border-radius:50%;right:8%;bottom:-66px;background:#efa762;box-shadow:0 0 0 18px #f1c18a,0 0 0 37px #f1d6a4}h1,h2,p{margin:0}h1,h2{font-family:"DM Serif Text",Georgia,serif;font-weight:normal}h1{font-size:clamp(37px,7vw,62px);letter-spacing:-.05em;line-height:1.2}header p{margin-top:8px}h2{font-size:29px;letter-spacing:-.03em}section{background:#fffef9;border:1px solid #d8dcce;border-radius:18px;padding:24px}.grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}.field{display:block;margin-top:18px;font-weight:600}input{accent-color:#315f45}input[type=date],input[type=time]{font:inherit;margin-top:5px;padding:10px 12px;border:1px solid #9da99a;border-radius:8px;background:white;width:100%;color:inherit;min-width:0}.check{display:flex;align-items:center;gap:9px;margin:20px 0}.check input{width:20px;height:20px}.save{width:100%;padding:12px;background:#315a42;color:white;border:0;border-radius:9px;font:inherit;font-weight:650;cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #bc742e;outline-offset:3px}.metric{display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-bottom:1px solid #e0e3d8;padding:15px 0}.metric strong{font:38px Georgia,serif}.muted,footer{color:#566559;font-size:14px}.history{margin-top:18px}.row{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;align-items:center;gap:8px;border-top:1px solid #dce0d4;padding:12px 0;font-size:14px}.edit{border:1px solid #bdc7b9;background:transparent;color:#315a42;border-radius:7px;padding:6px 12px;cursor:pointer}#entries{margin-top:14px}footer{margin-top:16px}#status:empty{display:none}#status{margin-top:8px}@media(max-width:620px){main{padding:16px 12px}.grid{grid-template-columns:1fr}section,header{padding:20px}header:after{right:-45px;opacity:.45}.row{grid-template-columns:1fr auto}.row b{grid-column:1}.row button{grid-column:2;grid-row:1 / 4}.row span{grid-column:1}.row{grid-template-rows:auto auto auto}.row span:nth-child(2){grid-row:2}.row span:nth-child(3){grid-row:3}}
+</style></head><body><main><header><h1>Morning routine</h1><p>Up at 7. A walk before work.</p></header><div class="grid"><section><h2>Daily check-in</h2><form id="log"><label class="field" for="day">Date</label><input type="date" id="day" required><label class="field" for="wake">Wake-up time</label><input type="time" id="wake" required><label class="check"><input type="checkbox" id="walk"> I walked before work</label><button class="save">Save morning</button><p id="status" role="status"></p></form></section><section><h2>Last 7 days</h2><p class="muted" id="range"></p><div class="metric"><span>Up by 7:00 a.m.</span><strong id="onTime">0 / 7</strong></div><div class="metric"><span>Walks before work</span><strong id="walks">0</strong></div><div class="metric"><span>Both goals met</span><strong id="both">0</strong></div></section></div><section class="history"><h2>Morning log</h2><div id="entries"></div></section><footer>Your entries are saved in this browser on this device.</footer></main>
+<script>
+const byId=id=>document.getElementById(id);
+const day=byId('day'),wake=byId('wake'),walk=byId('walk'),statusText=byId('status');
+const storageKey='morning-routine.days.v1';
+function dateKey(date){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')}
+function label(key,options){return new Date(key+'T12:00:00').toLocaleDateString(undefined,options)}
+function read(){return JSON.parse(localStorage.getItem(storageKey)||'{}')}
+let days={};
+function loadForm(){const entry=days[day.value];wake.value=entry?.wake||'';walk.checked=entry?.walk||false;statusText.textContent=''}
+function render(){
+ const now=new Date(),start=new Date(now);start.setDate(now.getDate()-6);
+ const first=dateKey(start),today=dateKey(now);day.max=today;
+ const short={month:'short',day:'numeric'};
+ byId('range').textContent=label(first,short)+' – '+label(today,short);
+ const recent=Object.entries(days).filter(([key])=>key>=first&&key<=today).map(([,entry])=>entry);
+ byId('onTime').textContent=recent.filter(e=>e.wake<='07:00').length+' / 7';
+ byId('walks').textContent=recent.filter(e=>e.walk).length;
+ byId('both').textContent=recent.filter(e=>e.walk&&e.wake<='07:00').length;
+ const entries=byId('entries');entries.replaceChildren();
+ const keys=Object.keys(days).sort().reverse();
+ if(!keys.length)entries.textContent='Your first check-in will appear here.';
+ for(const key of keys){
+ const e=days[key],row=document.createElement('div');row.className='row';
+ const values=[label(key,{...short,year:'numeric'}),new Date(key+'T'+e.wake).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}),e.walk?'Walk completed':'No walk logged'];
+ values.forEach((value,i)=>{const item=document.createElement(i?'span':'b');item.textContent=value;row.append(item)});
+ const edit=document.createElement('button');edit.className='edit';edit.textContent='Edit';edit.setAttribute('aria-label','Edit '+values[0]);edit.onclick=()=>{day.value=key;loadForm();wake.focus()};row.append(edit);entries.append(row);
+ }}
+day.value=dateKey(new Date());day.onchange=loadForm;
+try{days=read()}catch{statusText.textContent='Browser storage is unavailable. Open this file in a regular browser window.'}
+render();if(days[day.value])loadForm();
+byId('log').onsubmit=event=>{event.preventDefault();try{const latest=read();latest[day.value]={wake:wake.value,walk:walk.checked};localStorage.setItem(storageKey,JSON.stringify(latest));days=latest;render();statusText.textContent='Morning saved.'}catch{statusText.textContent='Could not save. Check that your browser allows local storage.'}};
+window.addEventListener('focus',()=>{try{days=read();render()}catch{}});
+</script></body></html>
